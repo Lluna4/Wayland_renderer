@@ -28,6 +28,9 @@ typedef struct four_axis
     int x_start;
     int x_end;
     struct color_alpha color;
+    char allign;
+    int x_speed;
+    int y_speed;
 }geometrical_4axis;
 
 
@@ -39,18 +42,18 @@ struct xdg_wm_base *shell;
 struct xdg_toplevel *toplevel;
 
 
-
 unsigned char *pixel;
-int width = 300;
-int height = 300;
+int width = 1300;
+int height = 1300;
 uint8_t c = 0;
 uint8_t cl = 0;
 //unsigned char **img;
 //struct metadata meta;
 geometrical_4axis *to_draw;
 int to_draw_size = 0;
-int sum = 2;
-int x_increase = 1;
+int sum = 0;
+int x_increase = 0;
+int first = 1;
 
 void prepare_pixels()
 {
@@ -78,16 +81,47 @@ void prepare_pixels()
 void render_forms()
 {
     int pxl_index = 0;
+    geometrical_4axis buff;
     for (int i = 0; i < to_draw_size; i++)
     {
-        for (int y = to_draw[i].y_start; y < to_draw[i].y_end;y++)
+        buff = to_draw[i];
+        if (to_draw[i].allign == 1)
+        {  
+            buff.x_start = width - to_draw[i].x_start;
+            buff.x_end = width - to_draw[i].x_end;
+        }
+        if (to_draw[i].allign == 2)
+        {  
+            buff.y_start = width - to_draw[i].y_start;
+            buff.y_end = width - to_draw[i].y_end;
+        }
+        if (to_draw[i].allign == 3)
+        {  
+            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+        }
+        if (to_draw[i].allign == 4)
+        {  
+            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.x_start = width - to_draw[i].x_start;
+            buff.x_end = width - to_draw[i].x_end;
+        }
+        if (to_draw[i].allign == 5)
+        {  
+            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.x_start = width/2 - ((to_draw[i].x_end - to_draw[i].x_start)/2);
+            buff.x_end = width/2 + ((to_draw[i].x_end - to_draw[i].x_start)/2);
+        }
+        for (int y = buff.y_start; y < buff.y_end;y++)
         {
-            pxl_index = (to_draw[i].x_start + width * y) * 4;
-            for (int x = to_draw[i].x_start; x < to_draw[i].x_end; x++)
+            pxl_index = (buff.x_start + width * y) * 4;
+            for (int x = buff.x_start; x < buff.x_end; x++)
             {
-                unsigned char r = to_draw[i].color.r;
-                unsigned char g = to_draw[i].color.g;
-                unsigned char b = to_draw[i].color.b;
+                unsigned char r = buff.color.r;
+                unsigned char g = buff.color.g;
+                unsigned char b = buff.color.b;
                 pixel[pxl_index] = r;
                 pxl_index++;
                 pixel[pxl_index] = g;
@@ -127,6 +161,79 @@ void clear_forms()
     }
 }
 
+void process_movement()
+{
+    for (int i = 0; i < to_draw_size; i++)
+    {
+        if (to_draw[i].y_end >= height - 20)
+            to_draw[i].y_speed = to_draw[i].y_speed * -1;
+        if (to_draw[i].y_start <= 0 + 20)
+            to_draw[i].y_speed = to_draw[i].y_speed * -1;
+        if (to_draw[i].x_end >= width - 20)
+            to_draw[i].x_speed = to_draw[i].x_speed * -1;
+        if (to_draw[i].x_start <= 0 + 20)
+            to_draw[i].x_speed = to_draw[i].x_speed * -1;
+        to_draw[i].y_start += to_draw[i].y_speed;
+        to_draw[i].y_end += to_draw[i].y_speed;
+        to_draw[i].x_start += to_draw[i].x_speed;
+        to_draw[i].x_end += to_draw[i].x_speed;
+        if (to_draw[i].x_speed != 0 || to_draw[i].y_speed != 0)
+            to_draw[i].allign = 0;
+    }
+}
+
+void check_collisions()
+{
+    geometrical_4axis buff;
+    for (int i = 0; i < to_draw_size; i++)
+    {
+        for (int y = 0; y < to_draw_size; y++)
+        {
+            buff = to_draw[y];
+            if (to_draw[y].allign == 1)
+            {  
+                buff.x_start = width - to_draw[y].x_start;
+                buff.x_end = width - to_draw[y].x_end;
+            }
+            if (to_draw[y].allign == 2)
+            {  
+                buff.y_start = width - to_draw[y].y_start;
+                buff.y_end = width - to_draw[y].y_end;
+            }
+            if (to_draw[y].allign == 3)
+            {  
+                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
+                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
+            }
+            if (to_draw[y].allign == 4)
+            {  
+                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
+                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
+                buff.x_start = width - to_draw[y].x_start;
+                buff.x_end = width - to_draw[y].x_end;
+            }
+            if (to_draw[y].allign == 5)
+            {  
+                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
+                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
+                buff.x_start = width/2 - ((to_draw[y].x_end - to_draw[y].x_start)/2);
+                buff.x_end = width/2 + ((to_draw[y].x_end - to_draw[y].x_start)/2);
+            }
+            if (i != y)
+            {
+                if (to_draw[i].x_start <= buff.x_end && to_draw[i].x_start >= buff.x_start)
+                {
+                    to_draw[i].x_speed *= -1;
+                }
+                else if (to_draw[i].x_end >= buff.x_start && to_draw[i].x_end <= buff.x_end)
+                {
+                    to_draw[i].x_speed *= -1;
+                }
+            }
+        }
+    }
+}
+
 int32_t allocate_shared_memory(uint64_t size)
 {
     int8_t *name = calloc(9, sizeof(int8_t));
@@ -153,6 +260,15 @@ void resize()
     wl_shm_pool_destroy(pool);
     prepare_pixels();
     render_forms();
+    if (first == 1)
+    {
+        to_draw[2].y_start = height/2 - ((to_draw[2].y_end - to_draw[2].y_start)/2);
+        to_draw[2].y_end = height/2 + ((to_draw[2].y_end - to_draw[2].y_start)/2);
+        to_draw[2].x_start = width/2 - ((to_draw[2].x_end - to_draw[2].x_start)/2);
+        to_draw[2].x_end = width/2 + ((to_draw[2].x_end - to_draw[2].x_start)/2);
+        printf("%i, %i, %i, %i\n", to_draw[2].x_start, to_draw[2].x_end, to_draw[2].y_start, to_draw[2].y_end);
+        first = 0;
+    }
     close(fd);
 }
 
@@ -174,22 +290,8 @@ void render_frame(void *data, struct wl_callback *callback, unsigned int callbac
     callback = wl_surface_frame(surface);
     wl_callback_add_listener(callback, &callback_listener, 0);
     clear_forms();
-    for (int i = 0; i < to_draw_size; i++)
-    {
-        if (to_draw[i].y_end >= height - 20)
-            sum = sum * -1;
-        if (to_draw[i].y_start <= 0 + 20)
-            sum = sum * -1;
-        if (to_draw[i].x_end >= width - 20)
-            x_increase = x_increase * -1;
-        if (to_draw[i].x_start <= 0 + 20)
-            x_increase = x_increase * -1;
-        to_draw[i].y_start += sum;
-        to_draw[i].y_end += sum;
-        to_draw[i].x_start += x_increase;
-        to_draw[i].x_end += x_increase;
-    }
-    //printf("%i %i", to_draw[0].y_start, to_draw[0].y_end);
+    check_collisions();
+    process_movement();
     render_forms();
     draw();
     clock_t end = clock();
@@ -291,12 +393,14 @@ int main()
     xdg_toplevel_add_listener(toplevel, &toplevel_listener, 0);
     xdg_toplevel_set_title(toplevel, "AAAAAAAAAAAA");
     wl_surface_commit(surface);
-    to_draw = calloc(2, sizeof(geometrical_4axis));
-    geometrical_4axis a = {100, 150, 100, 150, {255, 255, 255, 255}};
-    geometrical_4axis b = {100, 150, 400, 450, {255, 0, 0, 255}};
+    to_draw = calloc(4, sizeof(geometrical_4axis));
+    geometrical_4axis a = {100, 250, 30, 50, {255, 255, 255, 255}, 3, 0, 0};
+    geometrical_4axis b = {100, 250, 50, 30, {255, 255, 255, 255}, 4, 0, 0};
+    geometrical_4axis c = {500, 530, 500, 510, {255, 255, 255, 255}, 6, 1, 0};
     to_draw[0] = a;
     to_draw[1] = b;
-    to_draw_size = 1;
+    to_draw[2] = c;
+    to_draw_size = 3;
     
     
     while (wl_display_dispatch(disp))
