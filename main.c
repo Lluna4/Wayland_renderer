@@ -31,6 +31,8 @@ typedef struct four_axis
     char allign;
     int x_speed;
     int y_speed;
+    int frames_to_clear_movement;
+    char permanent_movement;
 }geometrical_4axis;
 
 
@@ -40,7 +42,8 @@ struct wl_buffer *frame_buff;
 struct wl_shm *shared_memory;
 struct xdg_wm_base *shell;
 struct xdg_toplevel *toplevel;
-
+struct wl_seat *seat;
+struct wl_keyboard *keyboard;
 
 unsigned char *pixel;
 int width = 1300;
@@ -54,6 +57,7 @@ int to_draw_size = 0;
 int sum = 0;
 int x_increase = 0;
 int first = 1;
+int clearing = 0;
 
 void prepare_pixels()
 {
@@ -98,21 +102,23 @@ void render_forms()
         if (to_draw[i].allign == 3)
         {  
             buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].y_start);
+            //printf("%i, %i\n", buff.y_start, buff.y_end);
         }
         if (to_draw[i].allign == 4)
         {  
             buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].y_start);
             buff.x_start = width - to_draw[i].x_start;
             buff.x_end = width - to_draw[i].x_end;
+            //printf("%i, %i\n", buff.y_start, buff.y_end);
         }
         if (to_draw[i].allign == 5)
         {  
             buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = height/2 + ((to_draw[i].y_end - to_draw[i].y_start)/2);
+            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].x_start);
             buff.x_start = width/2 - ((to_draw[i].x_end - to_draw[i].x_start)/2);
-            buff.x_end = width/2 + ((to_draw[i].x_end - to_draw[i].x_start)/2);
+            buff.x_end = buff.x_start + (buff.x_end - to_draw[i].x_start);
         }
         for (int y = buff.y_start; y < buff.y_end;y++)
         {
@@ -138,6 +144,7 @@ void render_forms()
 void clear_forms()
 {
     int pxl_index = 0;
+    clearing = 1;
     for (int i = 0; i < to_draw_size; i++)
     {
         for (int y = to_draw[i].y_start; y < to_draw[i].y_end;y++)
@@ -159,26 +166,34 @@ void clear_forms()
             }
         }
     }
+    clearing = 0;
 }
 
 void process_movement()
 {
     for (int i = 0; i < to_draw_size; i++)
     {
-        if (to_draw[i].y_end >= height - 20)
-            to_draw[i].y_speed = to_draw[i].y_speed * -1;
-        if (to_draw[i].y_start <= 0 + 20)
-            to_draw[i].y_speed = to_draw[i].y_speed * -1;
-        if (to_draw[i].x_end >= width - 20)
-            to_draw[i].x_speed = to_draw[i].x_speed * -1;
-        if (to_draw[i].x_start <= 0 + 20)
-            to_draw[i].x_speed = to_draw[i].x_speed * -1;
+        if (to_draw[i].y_end >= height - 5)
+            to_draw[i].y_speed = (to_draw[i].y_speed) * -1;
+        if (to_draw[i].y_start <= 0 + 10)
+            to_draw[i].y_speed = (to_draw[i].y_speed) * -1;
+        if (to_draw[i].x_end >= width - 5)
+            to_draw[i].x_speed = (to_draw[i].x_speed) * -1;
+        if (to_draw[i].x_start <= 0 + 10)
+            to_draw[i].x_speed = (to_draw[i].x_speed) * -1;
         to_draw[i].y_start += to_draw[i].y_speed;
         to_draw[i].y_end += to_draw[i].y_speed;
         to_draw[i].x_start += to_draw[i].x_speed;
         to_draw[i].x_end += to_draw[i].x_speed;
         if (to_draw[i].x_speed != 0 || to_draw[i].y_speed != 0)
             to_draw[i].allign = 0;
+        if (to_draw[i].frames_to_clear_movement > 0)
+            to_draw[i].frames_to_clear_movement--;
+        else if (to_draw[i].frames_to_clear_movement == 0 && to_draw[i].permanent_movement == 0)
+        {
+            to_draw[i].x_speed = 0;
+            to_draw[i].y_speed = 0;
+        }
     }
 }
 
@@ -211,6 +226,7 @@ void check_collisions()
                 buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
                 buff.x_start = width - to_draw[y].x_start;
                 buff.x_end = width - to_draw[y].x_end;
+                
             }
             if (to_draw[y].allign == 5)
             {  
@@ -223,11 +239,13 @@ void check_collisions()
             {
                 if (to_draw[i].x_start <= buff.x_end && to_draw[i].x_start >= buff.x_start)
                 {
-                    to_draw[i].x_speed *= -1;
+                    if (to_draw[i].y_start <= buff.y_end && to_draw[i].y_start >= buff.y_start)
+                        to_draw[i].x_speed *= -1;
                 }
                 else if (to_draw[i].x_end >= buff.x_start && to_draw[i].x_end <= buff.x_end)
                 {
-                    to_draw[i].x_speed *= -1;
+                    if (to_draw[i].y_start <= buff.y_end && to_draw[i].y_start >= buff.y_start)
+                        to_draw[i].x_speed *= -1;
                 }
             }
         }
@@ -260,15 +278,18 @@ void resize()
     wl_shm_pool_destroy(pool);
     prepare_pixels();
     render_forms();
-    if (first == 1)
+    /*if (first == 1)
     {
-        to_draw[2].y_start = height/2 - ((to_draw[2].y_end - to_draw[2].y_start)/2);
-        to_draw[2].y_end = height/2 + ((to_draw[2].y_end - to_draw[2].y_start)/2);
-        to_draw[2].x_start = width/2 - ((to_draw[2].x_end - to_draw[2].x_start)/2);
-        to_draw[2].x_end = width/2 + ((to_draw[2].x_end - to_draw[2].x_start)/2);
+        geometrical_4axis buff = to_draw[2];
+        int i = 2;
+        buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
+        buff.y_end = buff.y_start + (buff.y_end - to_draw[i].x_start);
+        buff.x_start = width/2 - ((to_draw[i].x_end - to_draw[i].x_start)/2);
+        buff.x_end = buff.x_start + (buff.x_end - to_draw[i].x_start);
+        to_draw[i] = buff;
         printf("%i, %i, %i, %i\n", to_draw[2].x_start, to_draw[2].x_end, to_draw[2].y_start, to_draw[2].y_end);
         first = 0;
-    }
+        }*/
     close(fd);
 }
 
@@ -347,6 +368,85 @@ struct xdg_toplevel_listener toplevel_listener = {.configure = toplevel_configur
     .wm_capabilities = toplevel_wm_capabilities};
 struct xdg_wm_base_listener shell_listener = {.ping = shell_ping};
 
+void kb_map(void* data, struct wl_keyboard* kb, uint32_t frmt, int32_t fd, uint32_t sz) 
+{
+	
+}
+
+void kb_enter(void* data, struct wl_keyboard* kb, uint32_t ser, struct wl_surface* srfc, struct wl_array* keys) 
+{
+	
+}
+
+void kb_leave(void* data, struct wl_keyboard* kb, uint32_t ser, struct wl_surface* srfc) 
+{
+	
+}
+
+void kb_key(void* data, struct wl_keyboard* kb, uint32_t ser, uint32_t t, uint32_t key, uint32_t stat) 
+{
+    //printf("%u\n", key);
+    if (key == 17)
+    {
+        if (to_draw[0].allign > 0)
+        {
+            geometrical_4axis buff = to_draw[0];
+            to_draw[0].y_start = height/2 - ((to_draw[0].y_end - to_draw[0].y_start)/2);
+            to_draw[0].y_end = height/2 + ((buff.y_end - buff.y_start)/2);
+            to_draw[0].allign = 0;
+        }
+        to_draw[0].y_speed = -2;
+        to_draw[0].frames_to_clear_movement = 15;
+    }
+    if (key == 31)
+    {
+        if (to_draw[0].allign > 0)
+        {
+            geometrical_4axis buff = to_draw[0];
+            to_draw[0].y_start = height/2 - ((to_draw[0].y_end - to_draw[0].y_start)/2);
+            to_draw[0].y_end = height/2 + ((buff.y_end - buff.y_start)/2);
+            to_draw[0].allign = 0;
+        }
+        to_draw[0].y_speed = 2;
+        to_draw[0].frames_to_clear_movement = 15;
+    }
+}
+
+void kb_mod(void* data, struct wl_keyboard* kb, uint32_t ser, uint32_t dep, uint32_t lat, uint32_t lock, uint32_t grp) 
+{
+	
+}
+
+void kb_rep(void* data, struct wl_keyboard* kb, int32_t rate, int32_t del) 
+{
+	
+}
+
+struct wl_keyboard_listener keyboard_listener = {
+	.keymap = kb_map,
+	.enter = kb_enter,
+	.leave = kb_leave,
+	.key = kb_key,
+	.modifiers = kb_mod,
+	.repeat_info = kb_rep
+};
+
+void seat_capabilites(void *data, struct wl_seat *seat, uint32_t capabilites)
+{
+    if (capabilites & WL_SEAT_CAPABILITY_KEYBOARD && !keyboard) 
+    {
+		keyboard = wl_seat_get_keyboard(seat);
+		wl_keyboard_add_listener(keyboard, &keyboard_listener, 0);
+	}
+}
+
+void seat_name(void *data, struct wl_seat *seat, const char *name)
+{
+    
+}
+struct wl_seat_listener seat_listener = {.capabilities = seat_capabilites, .name = seat_name};
+
+
 void reg_global(void *data, struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version)
 {
     if (strcmp(interface, wl_compositor_interface.name) == 0)
@@ -363,12 +463,18 @@ void reg_global(void *data, struct wl_registry *wl_registry, uint32_t name, cons
         shell = wl_registry_bind(wl_registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(shell, &shell_listener, 0);
     }
+    else if (strcmp(interface, wl_seat_interface.name) == 0)
+    {
+        seat = wl_registry_bind(wl_registry, name, &wl_seat_interface, 1);
+        wl_seat_add_listener(seat, &seat_listener, 0);
+    }
 }
 void reg_global_remove(void *data, struct wl_registry *wl_registry, uint32_t nam)
 {
     
 }
 struct wl_registry_listener listener = {.global = reg_global, .global_remove = reg_global_remove};
+
 
 
 
@@ -394,9 +500,9 @@ int main()
     xdg_toplevel_set_title(toplevel, "AAAAAAAAAAAA");
     wl_surface_commit(surface);
     to_draw = calloc(4, sizeof(geometrical_4axis));
-    geometrical_4axis a = {100, 250, 30, 50, {255, 255, 255, 255}, 3, 0, 0};
-    geometrical_4axis b = {100, 250, 50, 30, {255, 255, 255, 255}, 4, 0, 0};
-    geometrical_4axis c = {500, 530, 500, 510, {255, 255, 255, 255}, 6, 1, 0};
+    geometrical_4axis a = {100, 250, 30, 50, {255, 255, 255, 255}, 3, 0, 0, 0, 0};
+    geometrical_4axis b = {100, 250, 50, 30, {255, 255, 255, 255}, 4, 0, 0, 0, 0};
+    geometrical_4axis c = {500, 520, 360, 380, {255, 255, 255, 255}, 0, 2, 1, 0, 1};
     to_draw[0] = a;
     to_draw[1] = b;
     to_draw[2] = c;
@@ -409,6 +515,9 @@ int main()
             break;
     }
     
+    if (keyboard)
+        wl_keyboard_destroy(keyboard);
+    wl_seat_release(seat);
     if (frame_buff)
     {
         wl_buffer_destroy(frame_buff);
