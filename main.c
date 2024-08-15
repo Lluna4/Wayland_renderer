@@ -10,30 +10,9 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "xdg-shell-client-protocol.h"
+#include "game_lib/library.h"
 //#include "png_lib.h"
 #include "time.h"
-
-struct color_alpha
-{
-    int r;
-    int g;
-    int b;
-    int alpha;
-};
-
-typedef struct four_axis
-{
-    int y_start;
-    int y_end;
-    int x_start;
-    int x_end;
-    struct color_alpha color;
-    char allign;
-    int x_speed;
-    int y_speed;
-    int frames_to_clear_movement;
-    char permanent_movement;
-}geometrical_4axis;
 
 
 struct wl_compositor *compositor;
@@ -58,6 +37,10 @@ int sum = 0;
 int x_increase = 0;
 int first = 1;
 int clearing = 0;
+int pressing_w = 0;
+int pressing_s = 0;
+int pressing_e = 0;
+int pressing_d = 0;
 
 void prepare_pixels()
 {
@@ -89,37 +72,6 @@ void render_forms()
     for (int i = 0; i < to_draw_size; i++)
     {
         buff = to_draw[i];
-        if (to_draw[i].allign == 1)
-        {  
-            buff.x_start = width - to_draw[i].x_start;
-            buff.x_end = width - to_draw[i].x_end;
-        }
-        if (to_draw[i].allign == 2)
-        {  
-            buff.y_start = width - to_draw[i].y_start;
-            buff.y_end = width - to_draw[i].y_end;
-        }
-        if (to_draw[i].allign == 3)
-        {  
-            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].y_start);
-            //printf("%i, %i\n", buff.y_start, buff.y_end);
-        }
-        if (to_draw[i].allign == 4)
-        {  
-            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].y_start);
-            buff.x_start = width - to_draw[i].x_start;
-            buff.x_end = width - to_draw[i].x_end;
-            //printf("%i, %i\n", buff.y_start, buff.y_end);
-        }
-        if (to_draw[i].allign == 5)
-        {  
-            buff.y_start = height/2 - ((to_draw[i].y_end - to_draw[i].y_start)/2);
-            buff.y_end = buff.y_start + (buff.y_end - to_draw[i].x_start);
-            buff.x_start = width/2 - ((to_draw[i].x_end - to_draw[i].x_start)/2);
-            buff.x_end = buff.x_start + (buff.x_end - to_draw[i].x_start);
-        }
         for (int y = buff.y_start; y < buff.y_end;y++)
         {
             pxl_index = (buff.x_start + width * y) * 4;
@@ -128,13 +80,14 @@ void render_forms()
                 unsigned char r = buff.color.r;
                 unsigned char g = buff.color.g;
                 unsigned char b = buff.color.b;
+                unsigned char a = buff.color.alpha;
                 pixel[pxl_index] = r;
                 pxl_index++;
                 pixel[pxl_index] = g;
                 pxl_index++;
                 pixel[pxl_index] = b;
                 pxl_index++;
-                pixel[pxl_index] = 255;
+                pixel[pxl_index] = a;
                 pxl_index++;
             }
         }
@@ -169,88 +122,6 @@ void clear_forms()
     clearing = 0;
 }
 
-void process_movement()
-{
-    for (int i = 0; i < to_draw_size; i++)
-    {
-        if (to_draw[i].y_end >= height - 5)
-            to_draw[i].y_speed = (to_draw[i].y_speed) * -1;
-        if (to_draw[i].y_start <= 0 + 10)
-            to_draw[i].y_speed = (to_draw[i].y_speed) * -1;
-        if (to_draw[i].x_end >= width - 5)
-            to_draw[i].x_speed = (to_draw[i].x_speed) * -1;
-        if (to_draw[i].x_start <= 0 + 10)
-            to_draw[i].x_speed = (to_draw[i].x_speed) * -1;
-        to_draw[i].y_start += to_draw[i].y_speed;
-        to_draw[i].y_end += to_draw[i].y_speed;
-        to_draw[i].x_start += to_draw[i].x_speed;
-        to_draw[i].x_end += to_draw[i].x_speed;
-        if (to_draw[i].x_speed != 0 || to_draw[i].y_speed != 0)
-            to_draw[i].allign = 0;
-        if (to_draw[i].frames_to_clear_movement > 0)
-            to_draw[i].frames_to_clear_movement--;
-        else if (to_draw[i].frames_to_clear_movement == 0 && to_draw[i].permanent_movement == 0)
-        {
-            to_draw[i].x_speed = 0;
-            to_draw[i].y_speed = 0;
-        }
-    }
-}
-
-void check_collisions()
-{
-    geometrical_4axis buff;
-    for (int i = 0; i < to_draw_size; i++)
-    {
-        for (int y = 0; y < to_draw_size; y++)
-        {
-            buff = to_draw[y];
-            if (to_draw[y].allign == 1)
-            {  
-                buff.x_start = width - to_draw[y].x_start;
-                buff.x_end = width - to_draw[y].x_end;
-            }
-            if (to_draw[y].allign == 2)
-            {  
-                buff.y_start = width - to_draw[y].y_start;
-                buff.y_end = width - to_draw[y].y_end;
-            }
-            if (to_draw[y].allign == 3)
-            {  
-                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
-                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
-            }
-            if (to_draw[y].allign == 4)
-            {  
-                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
-                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
-                buff.x_start = width - to_draw[y].x_start;
-                buff.x_end = width - to_draw[y].x_end;
-                
-            }
-            if (to_draw[y].allign == 5)
-            {  
-                buff.y_start = height/2 - ((to_draw[y].y_end - to_draw[y].y_start)/2);
-                buff.y_end = height/2 + ((to_draw[y].y_end - to_draw[y].y_start)/2);
-                buff.x_start = width/2 - ((to_draw[y].x_end - to_draw[y].x_start)/2);
-                buff.x_end = width/2 + ((to_draw[y].x_end - to_draw[y].x_start)/2);
-            }
-            if (i != y)
-            {
-                if (to_draw[i].x_start <= buff.x_end && to_draw[i].x_start >= buff.x_start)
-                {
-                    if (to_draw[i].y_start <= buff.y_end && to_draw[i].y_start >= buff.y_start)
-                        to_draw[i].x_speed *= -1;
-                }
-                else if (to_draw[i].x_end >= buff.x_start && to_draw[i].x_end <= buff.x_end)
-                {
-                    if (to_draw[i].y_start <= buff.y_end && to_draw[i].y_start >= buff.y_start)
-                        to_draw[i].x_speed *= -1;
-                }
-            }
-        }
-    }
-}
 
 int32_t allocate_shared_memory(uint64_t size)
 {
@@ -276,8 +147,15 @@ void resize()
     struct wl_shm_pool *pool = wl_shm_create_pool(shared_memory, fd, width * height * 4);
     frame_buff = wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, WL_SHM_FORMAT_ABGR8888);
     wl_shm_pool_destroy(pool);
+    allign(&to_draw[0], CENTER_Y, (struct window_meta){.height = height, .width = width});
+    allign(&to_draw[1], CENTER_Y, (struct window_meta){.height = height, .width = width});
+    allign(&to_draw[1], OTHERSIDE_X, (struct window_meta){.height = height, .width = width});
+    allign(&to_draw[2], FULL_CENTER, (struct window_meta){.height = height, .width = width});
+    printf("pos: %i, %i, %i, %i\n", to_draw[0].y_start, to_draw[0].y_end, to_draw[0].x_start, to_draw[0].x_end);
+    printf("pos2: %i, %i, %i, %i\n", to_draw[1].y_start, to_draw[1].y_end, to_draw[1].x_start, to_draw[1].x_end);
     prepare_pixels();
     render_forms();
+
     /*if (first == 1)
     {
         geometrical_4axis buff = to_draw[2];
@@ -311,8 +189,10 @@ void render_frame(void *data, struct wl_callback *callback, unsigned int callbac
     callback = wl_surface_frame(surface);
     wl_callback_add_listener(callback, &callback_listener, 0);
     clear_forms();
-    check_collisions();
-    process_movement();
+    process_collisions(to_draw, to_draw_size);
+    process_movement(to_draw, to_draw_size, 15, (struct window_meta){.height = height, .width = width});
+    keyboard_movement(&to_draw[0], pressing_w, pressing_s);
+    keyboard_movement(&to_draw[1], pressing_e, pressing_d);
     render_forms();
     draw();
     clock_t end = clock();
@@ -386,29 +266,41 @@ void kb_leave(void* data, struct wl_keyboard* kb, uint32_t ser, struct wl_surfac
 void kb_key(void* data, struct wl_keyboard* kb, uint32_t ser, uint32_t t, uint32_t key, uint32_t stat) 
 {
     //printf("%u\n", key);
-    if (key == 17)
+    if (key == 16 && stat == WL_KEYBOARD_KEY_STATE_PRESSED)
     {
-        if (to_draw[0].allign > 0)
-        {
-            geometrical_4axis buff = to_draw[0];
-            to_draw[0].y_start = height/2 - ((to_draw[0].y_end - to_draw[0].y_start)/2);
-            to_draw[0].y_end = height/2 + ((buff.y_end - buff.y_start)/2);
-            to_draw[0].allign = 0;
-        }
-        to_draw[0].y_speed = -2;
-        to_draw[0].frames_to_clear_movement = 15;
+        to_draw[0].y_speed = -5;
+        pressing_w = 1;
     }
-    if (key == 31)
+    else if (key == 16 && stat == WL_KEYBOARD_KEY_STATE_RELEASED)
     {
-        if (to_draw[0].allign > 0)
-        {
-            geometrical_4axis buff = to_draw[0];
-            to_draw[0].y_start = height/2 - ((to_draw[0].y_end - to_draw[0].y_start)/2);
-            to_draw[0].y_end = height/2 + ((buff.y_end - buff.y_start)/2);
-            to_draw[0].allign = 0;
-        }
-        to_draw[0].y_speed = 2;
-        to_draw[0].frames_to_clear_movement = 15;
+        pressing_w = 0;
+    }
+    else if (key == 18 && stat == WL_KEYBOARD_KEY_STATE_PRESSED)
+    {
+        to_draw[1].y_speed = -5;
+        pressing_e = 1;
+    }
+    else if (key == 18 && stat == WL_KEYBOARD_KEY_STATE_RELEASED)
+    {
+        pressing_e = 0;
+    }
+    else if (key == 30 && stat == WL_KEYBOARD_KEY_STATE_PRESSED)
+    {
+        to_draw[0].y_speed = 5;
+        pressing_s = 1;
+    }
+    else if (key == 30 && stat == WL_KEYBOARD_KEY_STATE_RELEASED)
+    {
+        pressing_s = 0;
+    }
+    else if (key == 32 && stat == WL_KEYBOARD_KEY_STATE_PRESSED)
+    {
+        to_draw[1].y_speed = 5;
+        pressing_d = 1;
+    }
+    else if (key == 32 && stat == WL_KEYBOARD_KEY_STATE_RELEASED)
+    {
+        pressing_d = 0;
     }
 }
 
@@ -419,7 +311,7 @@ void kb_mod(void* data, struct wl_keyboard* kb, uint32_t ser, uint32_t dep, uint
 
 void kb_rep(void* data, struct wl_keyboard* kb, int32_t rate, int32_t del) 
 {
-	
+	printf("rate %i, delay %i\n", rate, del);
 }
 
 struct wl_keyboard_listener keyboard_listener = {
@@ -476,9 +368,6 @@ void reg_global_remove(void *data, struct wl_registry *wl_registry, uint32_t nam
 struct wl_registry_listener listener = {.global = reg_global, .global_remove = reg_global_remove};
 
 
-
-
-
 int main()
 {
     struct wl_display *disp = wl_display_connect(0);
@@ -500,9 +389,11 @@ int main()
     xdg_toplevel_set_title(toplevel, "AAAAAAAAAAAA");
     wl_surface_commit(surface);
     to_draw = calloc(4, sizeof(geometrical_4axis));
-    geometrical_4axis a = {100, 250, 30, 50, {255, 255, 255, 255}, 3, 0, 0, 0, 0};
-    geometrical_4axis b = {100, 250, 50, 30, {255, 255, 255, 255}, 4, 0, 0, 0, 0};
-    geometrical_4axis c = {500, 520, 360, 380, {255, 255, 255, 255}, 0, 2, 1, 0, 1};
+    geometrical_4axis a = create_four_axis(30, 50, 100, 250, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis b = create_four_axis(30, 50, 100, 250, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis c = create_four_axis(40, 50, 10, 20, (struct color_alpha){255, 255, 255, 255});
+    c.x_speed = 3;
+    c.y_speed = 0;
     to_draw[0] = a;
     to_draw[1] = b;
     to_draw[2] = c;
