@@ -81,6 +81,8 @@ void render_forms()
                 unsigned char g = buff.color.g;
                 unsigned char b = buff.color.b;
                 unsigned char a = buff.color.alpha;
+                if (a == 0)
+                    continue;
                 pixel[pxl_index] = r;
                 pxl_index++;
                 pixel[pxl_index] = g;
@@ -189,15 +191,22 @@ void render_frame(void *data, struct wl_callback *callback, unsigned int callbac
     callback = wl_surface_frame(surface);
     wl_callback_add_listener(callback, &callback_listener, 0);
     clear_forms();
-    process_collisions(to_draw, to_draw_size);
-    process_movement(to_draw, to_draw_size, 15, (struct window_meta){.height = height, .width = width});
     keyboard_movement(&to_draw[0], pressing_w, pressing_s);
     keyboard_movement(&to_draw[1], pressing_e, pressing_d);
+    process_collisions(&to_draw[2], to_draw , 1, to_draw_size - 1);
+    if (process_movement_rebound(&to_draw[2], 1, 5, (struct window_meta){.height = height, .width = width}) == 1)
+    {
+        allign(&to_draw[0], CENTER_Y, (struct window_meta){.height = height, .width = width});
+        allign(&to_draw[1], CENTER_Y, (struct window_meta){.height = height, .width = width});
+        allign(&to_draw[1], OTHERSIDE_X, (struct window_meta){.height = height, .width = width});
+        allign(&to_draw[2], FULL_CENTER, (struct window_meta){.height = height, .width = width});
+    }
+    process_movement(to_draw, to_draw_size - 1, 5, (struct window_meta){.height = height, .width = width});
     render_forms();
     draw();
     clock_t end = clock();
     double time_spent = (double)(end - begin);
-    printf("Frame time: %fms\n", time_spent/1000);
+    //printf("Frame time: %fms\n", time_spent/1000);
 }
 
 struct wl_callback_listener callback_listener = {.done = render_frame};
@@ -389,11 +398,11 @@ int main()
     xdg_toplevel_set_title(toplevel, "AAAAAAAAAAAA");
     wl_surface_commit(surface);
     to_draw = calloc(4, sizeof(geometrical_4axis));
-    geometrical_4axis a = create_four_axis(30, 50, 100, 250, (struct color_alpha){255, 255, 255, 255});
-    geometrical_4axis b = create_four_axis(30, 50, 100, 250, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis a = create_four_axis(30, 50, 100, 175, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis b = create_four_axis(30, 50, 100, 175, (struct color_alpha){255, 255, 255, 255});
     geometrical_4axis c = create_four_axis(40, 50, 10, 20, (struct color_alpha){255, 255, 255, 255});
     c.x_speed = 3;
-    c.y_speed = 0;
+    c.y_speed = 1;
     to_draw[0] = a;
     to_draw[1] = b;
     to_draw[2] = c;

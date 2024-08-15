@@ -2,6 +2,7 @@
 #define UNTITLED2_LIBRARY_H
 
 #include <stdio.h>
+#include <stdlib.h>
 
 struct color_alpha
 {
@@ -42,9 +43,9 @@ enum align_shape
 };
 
 geometrical_4axis create_four_axis(int x_start, int x_end, int y_start, int y_end, struct color_alpha color);
+void allign(geometrical_4axis *shape, int allign_type, struct window_meta meta);
+int process_movement_rebound(geometrical_4axis *shapes, size_t shape_size, int border_size, struct window_meta meta);
 void process_movement(geometrical_4axis *shapes, size_t shape_size, int border_size, struct window_meta meta);
 void keyboard_movement(geometrical_4axis *shape, int pressed_s, int pressed_d);
-void process_collisions(geometrical_4axis *shapes, size_t shape_size);
-void allign(geometrical_4axis *shape, int allign_type, struct window_meta meta);
-
+void process_collisions(geometrical_4axis *shapes, geometrical_4axis *shapes_collision, size_t shape_size, size_t collision_size);
 #endif //UNTITLED2_LIBRARY_H
