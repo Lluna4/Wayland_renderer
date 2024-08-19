@@ -41,8 +41,14 @@ int pressing_w = 0;
 int pressing_s = 0;
 int pressing_e = 0;
 int pressing_d = 0;
+int gpu_rend = 0;
 
-void prepare_pixels()
+extern void prepare_pixels(unsigned char *pxl, int width, int height);
+extern void render_shapes(unsigned char *pxl, int width, int height, geometrical_4axis *shapes, int shapes_size);
+extern int number_dev();
+
+
+void prepare_pixels_cpu()
 {
     int index = 0;
     int pxl_index = 0;
@@ -155,8 +161,16 @@ void resize()
     allign(&to_draw[2], FULL_CENTER, (struct window_meta){.height = height, .width = width});
     printf("pos: %i, %i, %i, %i\n", to_draw[0].y_start, to_draw[0].y_end, to_draw[0].x_start, to_draw[0].x_end);
     printf("pos2: %i, %i, %i, %i\n", to_draw[1].y_start, to_draw[1].y_end, to_draw[1].x_start, to_draw[1].x_end);
-    prepare_pixels();
-    render_forms();
+    if (gpu_rend == 1)
+    {
+        prepare_pixels(pixel, width, height);
+        render_shapes(pixel, width, height, to_draw, to_draw_size);
+    }
+    else
+    {
+        prepare_pixels_cpu();
+        render_forms();
+    }
 
     /*if (first == 1)
     {
@@ -200,9 +214,14 @@ void render_frame(void *data, struct wl_callback *callback, unsigned int callbac
         allign(&to_draw[1], CENTER_Y, (struct window_meta){.height = height, .width = width});
         allign(&to_draw[1], OTHERSIDE_X, (struct window_meta){.height = height, .width = width});
         allign(&to_draw[2], FULL_CENTER, (struct window_meta){.height = height, .width = width});
+        to_draw[2].x_speed = 1;
+        to_draw[2].y_speed = 2;
     }
     process_movement(to_draw, to_draw_size - 1, 5, (struct window_meta){.height = height, .width = width});
-    render_forms();
+    if (gpu_rend == 1)
+        render_shapes(pixel, width, height, to_draw, to_draw_size);
+    else
+        render_forms();
     draw();
     clock_t end = clock();
     double time_spent = (double)(end - begin);
@@ -261,7 +280,6 @@ void kb_map(void* data, struct wl_keyboard* kb, uint32_t frmt, int32_t fd, uint3
 {
 	
 }
-
 void kb_enter(void* data, struct wl_keyboard* kb, uint32_t ser, struct wl_surface* srfc, struct wl_array* keys) 
 {
 	
@@ -379,6 +397,9 @@ struct wl_registry_listener listener = {.global = reg_global, .global_remove = r
 
 int main()
 {
+    int dev = number_dev();
+    if (dev > 0)
+        gpu_rend = 1;
     struct wl_display *disp = wl_display_connect(0);
     if (!disp)
         return -1;
@@ -398,11 +419,11 @@ int main()
     xdg_toplevel_set_title(toplevel, "AAAAAAAAAAAA");
     wl_surface_commit(surface);
     to_draw = calloc(4, sizeof(geometrical_4axis));
-    geometrical_4axis a = create_four_axis(30, 50, 100, 175, (struct color_alpha){255, 255, 255, 255});
-    geometrical_4axis b = create_four_axis(30, 50, 100, 175, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis a = create_four_axis(30, 50, 100, 200, (struct color_alpha){255, 255, 255, 255});
+    geometrical_4axis b = create_four_axis(30, 50, 100, 200, (struct color_alpha){255, 255, 255, 255});
     geometrical_4axis c = create_four_axis(40, 50, 10, 20, (struct color_alpha){255, 255, 255, 255});
-    c.x_speed = 3;
-    c.y_speed = 1;
+    c.x_speed = 1;
+    c.y_speed = 2;
     to_draw[0] = a;
     to_draw[1] = b;
     to_draw[2] = c;
